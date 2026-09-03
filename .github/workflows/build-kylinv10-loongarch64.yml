@@ -90,7 +90,7 @@ jobs:
         run: |
           set -euo pipefail
           IMAGE="local/kylinv10-loongarch64:${GITHUB_SHA::12}"
-          docker run --rm --platform linux/loong64 "$IMAGE" bash -ec '
+          docker run --rm --platform linux/loong64 --entrypoint /bin/bash "$IMAGE" -ec '
             set -euo pipefail
             test -s /etc/kylinv10-build-environment
             cmake --version
