@@ -47,14 +47,22 @@ apt-get update \
 
 # Debian debootstrap has no built-in 10.1 profile; the helper image aliases
 # its sid package recipe to 10.1 while retaining the Kylin suite and URL.
+KYLIN_RUN_SECOND_STAGE="${KYLIN_RUN_SECOND_STAGE:-1}"
 printf 'Bootstrapping Kylin %s (%s), %s packages\n' "$SUITE" "$REPOSITORY_URL" "${#PACKAGES[@]}"
 debootstrap \
     --no-check-gpg \
+    --foreign \
     --arch=loongarch64 \
     --variant=minbase \
     --components="$COMPONENTS" \
     --include="$INCLUDE" \
     "$SUITE" "$ROOTFS" "$REPOSITORY_URL"
+
+if [ "$KYLIN_RUN_SECOND_STAGE" = 1 ]; then
+    # The second stage executes target maintainer scripts; native LoongArch
+    # runners must run it, while local x86/QEMU smoke tests may skip it.
+    chroot "$ROOTFS" /debootstrap/debootstrap --second-stage
+fi
 
 # Keep the exact source available for diagnostics, without copying helper apt
 # credentials or the helper's package indexes into the image.
