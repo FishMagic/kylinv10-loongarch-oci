@@ -85,6 +85,18 @@ jobs:
               "$RUNNER_TEMP/kylinv10-rootfs/rootfs.tar" \
               "local/kylinv10-loongarch64:${GITHUB_SHA::12}" \
               "$RUNNER_TEMP/kylinv10-rootfs"
+      - name: Smoke test runnable Kylin image
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE="local/kylinv10-loongarch64:${GITHUB_SHA::12}"
+          docker run --rm --platform linux/loong64 "$IMAGE" bash -ec '
+            set -euo pipefail
+            test -s /etc/kylinv10-build-environment
+            cmake --version
+            g++ --version
+            pkg-config --modversion webkit2gtk-4.0
+          '
 
       - name: Publish runnable image to GHCR
         if: ${{ github.event_name == 'push' || inputs.publish_image == true }}
