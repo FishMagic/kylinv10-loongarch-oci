@@ -62,6 +62,17 @@ if [ "$KYLIN_RUN_SECOND_STAGE" = 1 ]; then
     # The second stage executes target maintainer scripts; native LoongArch
     # runners must run it, while local x86/QEMU smoke tests may skip it.
     chroot "$ROOTFS" /debootstrap/debootstrap --second-stage
+else
+    # Foreign bootstrap has downloaded the requested archives but only
+    # unpacked the base set. Extract the remaining archives without executing
+    # Kylin maintainer scripts; this mode is for QEMU smoke tests only.
+    shopt -s nullglob
+    BOOTSTRAP_DEBS=("$ROOTFS"/var/cache/apt/archives/*.deb)
+    [ "${#BOOTSTRAP_DEBS[@]}" -gt 0 ] || { echo "foreign bootstrap produced no package archives" >&2; exit 1; }
+    for deb in "${BOOTSTRAP_DEBS[@]}"; do
+        dpkg-deb -x "$deb" "$ROOTFS"
+    done
+    ldconfig -r "$ROOTFS"
 fi
 
 # Keep the exact source available for diagnostics, without copying helper apt
