@@ -1,0 +1,127 @@
+name: Build Kylin V10 loongarch64 OCI environment
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'kylin.sources'
+      - 'packages-kylinv10-loongarch64.txt'
+      - 'build-rootfs.sh'
+      - 'build-oci.sh'
+      - 'Dockerfile'
+      - 'Dockerfile.rootfs-builder'
+      - '.github/workflows/build-kylinv10-loongarch64.yml'
+  workflow_dispatch:
+    inputs:
+      publish_image:
+        description: 'Push the runnable Kylin image to GHCR'
+        required: false
+        default: true
+        type: boolean
+
+concurrency:
+  group: kylinv10-loongarch64-oci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Kylin V10 loongarch64 rootfs and OCI
+    runs-on: ${{ vars.LOONGARCH_RUNNER || 'loongarch64' }}
+    timeout-minutes: 240
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Verify native loongarch64 runner and disk
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$(uname -m)" in loongarch64|loong64) ;; *) exit 2 ;; esac
+          docker info
+          df -h
+
+      - name: Build Kylin rootfs helper
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker buildx build --platform linux/loong64 --load \
+            --tag local/kylinv10-loongarch64-rootfs-builder:ci \
+            --file Dockerfile.rootfs-builder .
+
+      - name: Resolve Kylin packages and create rootfs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/kylinv10-rootfs"
+          docker run --rm --platform linux/loong64 \
+            --volume "$GITHUB_WORKSPACE:/src:ro" \
+            --volume "$RUNNER_TEMP/kylinv10-rootfs:/out" \
+            local/kylinv10-loongarch64-rootfs-builder:ci
+
+      - name: Configure OCI exporter builder
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker buildx create --name kylinv10-loongarch64-oci --driver docker-container --use
+          docker buildx inspect --bootstrap
+
+      - name: Build runnable image and OCI archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          OCI_DOCKERFILE="$GITHUB_WORKSPACE/Dockerfile" \
+          OCI_OUTPUT_PREFIX=kylinv10-loongarch64 \
+            ./build-oci.sh \
+              "$RUNNER_TEMP/kylinv10-rootfs/rootfs.tar" \
+              "local/kylinv10-loongarch64:${GITHUB_SHA::12}" \
+              "$RUNNER_TEMP/kylinv10-rootfs"
+
+      - name: Publish runnable image to GHCR
+        if: ${{ github.event_name == 'push' || inputs.publish_image == true }}
+        shell: bash
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          OWNER="${GITHUB_REPOSITORY_OWNER,,}"
+          IMAGE="ghcr.io/${OWNER}/kylinv10-loongarch64:${GITHUB_SHA::12}"
+          MOVING="ghcr.io/${OWNER}/kylinv10-loongarch64:10.1"
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io \
+            --username "$GITHUB_ACTOR" --password-stdin
+          docker tag "local/kylinv10-loongarch64:${GITHUB_SHA::12}" "$IMAGE"
+          docker push "$IMAGE"
+          docker tag "$IMAGE" "$MOVING"
+          docker push "$MOVING"
+
+      - name: Compress rootfs and OCI archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          if command -v zstd >/dev/null 2>&1; then
+            zstd -T0 -19 -f "$RUNNER_TEMP/kylinv10-rootfs/rootfs.tar" \
+              -o "$RUNNER_TEMP/kylinv10-rootfs/kylinv10-loongarch64-rootfs.tar.zst"
+          else
+            gzip -9 -c "$RUNNER_TEMP/kylinv10-rootfs/rootfs.tar" \
+              > "$RUNNER_TEMP/kylinv10-rootfs/kylinv10-loongarch64-rootfs.tar.gz"
+          fi
+
+      - name: Upload Kylin rootfs, OCI image, and manifest
+        uses: actions/upload-artifact@v6
+        with:
+          name: kylinv10-loongarch64-oci-${{ github.sha }}
+          if-no-files-found: error
+          compression-level: 0
+          path: |
+            ${{ runner.temp }}/kylinv10-rootfs/rootfs.tar
+            ${{ runner.temp }}/kylinv10-rootfs/rootfs.tar.sha256
+            ${{ runner.temp }}/kylinv10-rootfs/kylinv10-loongarch64-rootfs.tar.*
+            ${{ runner.temp }}/kylinv10-rootfs/kylinv10-loongarch64-manifest.txt
+            ${{ runner.temp }}/kylinv10-rootfs/kylinv10-loongarch64.oci.tar
+            ${{ runner.temp }}/kylinv10-rootfs/kylinv10-loongarch64.oci.tar.zst
+            ${{ runner.temp }}/kylinv10-rootfs/kylinv10-loongarch64-image.tar
+            ${{ runner.temp }}/kylinv10-rootfs/kylinv10-loongarch64-image.tar.zst

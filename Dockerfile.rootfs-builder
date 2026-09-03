@@ -1,0 +1,12 @@
+# syntax=docker/dockerfile:1.7
+# This pinned Debian-ports image supplies only debootstrap and transport
+# binaries. The exported rootfs is assembled exclusively from kylin.sources.
+FROM lcr.loongnix.cn/library/debian:latest@sha256:b72a8e0dd1b58ec95fef3e9dde9f274f18ad8c514f19803aebd4d67c3e2ae4b1
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends debootstrap wget ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && cp /usr/share/debootstrap/scripts/sid /usr/share/debootstrap/scripts/10.1
+COPY build-rootfs.sh /usr/local/bin/build-rootfs.sh
+RUN chmod 0755 /usr/local/bin/build-rootfs.sh
+ENTRYPOINT ["/usr/local/bin/build-rootfs.sh"]

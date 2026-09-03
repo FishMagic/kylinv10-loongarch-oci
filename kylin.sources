@@ -1,0 +1,5 @@
+# Galaxy Kylin V10 SP1 10.1 official loongarch64 archive.
+# The archive currently publishes a signed InRelease whose key is not present
+# in the public bootstrap image; build-rootfs.sh therefore enables the
+# explicitly pinned trusted bootstrap mode.
+deb [arch=loongarch64 trusted=yes] http://archive.kylinos.cn/kylin/KYLIN-ALL 10.1 main restricted multiverse universe
