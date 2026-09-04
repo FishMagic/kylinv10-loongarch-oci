@@ -8,6 +8,7 @@ on:
       - 'kylin.sources'
       - 'packages-kylinv10-loongarch64.txt'
       - 'build-rootfs.sh'
+      - 'build-bambustudio-kylinv10.sh'
       - 'build-oci.sh'
       - 'Dockerfile'
       - 'Dockerfile.rootfs-builder'
