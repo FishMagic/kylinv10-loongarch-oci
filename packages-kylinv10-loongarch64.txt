@@ -4,6 +4,7 @@
 base-files
 base-passwd
 bash
+gawk
 dash
 coreutils
 dpkg

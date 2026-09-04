@@ -84,6 +84,8 @@ cat > "$ROOTFS/etc/apt/apt.conf.d/99-kylin-build" <<'APT'
 Acquire::Check-Valid-Until "false";
 Acquire::AllowInsecureRepositories "true";
 APT
+install -D -m 0755 /src/build-bambustudio-kylinv10.sh \
+    "$ROOTFS/usr/local/bin/build-bambustudio-kylinv10.sh"
 cat > "$ROOTFS/etc/kylinv10-build-environment" <<META
 NAME=Galaxy Kylin V10 SP1
 SUITE=$SUITE
@@ -108,6 +110,8 @@ for required in \
     "$ROOTFS/usr/bin/g++" \
     "$ROOTFS/usr/bin/git" \
     "$ROOTFS/usr/bin/wget" \
+    "$ROOTFS/usr/bin/awk" \
+    "$ROOTFS/usr/local/bin/build-bambustudio-kylinv10.sh" \
     "$ROOTFS/usr/include/webkitgtk-4.0/webkit2/webkit2.h"; do
     [ -e "$required" ] || { echo "Kylin rootfs missing required file: $required" >&2; exit 1; }
 done
