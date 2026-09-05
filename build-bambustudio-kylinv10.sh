@@ -7,6 +7,7 @@ SRC="${BAMBU_SOURCE_DIR:-/src}"
 WORK="${BAMBU_WORK_DIR:-/work/BambuStudio}"
 OUT="${BAMBU_OUTPUT_DIR:-/out}"
 JOBS="${BAMBU_JOBS:-$(nproc)}"
+DEPS_ARCHIVE="${BAMBU_DEPS_ARCHIVE:-}"
 
 case "$(uname -m)" in
     loongarch64|loong64) ;;
@@ -18,6 +19,11 @@ rm -rf "$WORK"
 mkdir -p "$WORK"
 cp -r "$SRC/." "$WORK/"
 cd "$WORK"
+if [[ -n "$DEPS_ARCHIVE" ]]; then
+    [ -s "$DEPS_ARCHIVE" ] || { echo "missing dependency archive: $DEPS_ARCHIVE" >&2; exit 1; }
+    mkdir -p deps/build
+    zstd -dc "$DEPS_ARCHIVE" | tar -xf - -C deps/build
+fi
 
 git config --global --add safe.directory "$WORK" >/dev/null 2>&1 || true
 export BAMBU_TARGET_DISTRO=loongarch64
@@ -42,8 +48,19 @@ EOF
     export LD_PRELOAD="/tmp/bambu-no-sigprocmask.so${LD_PRELOAD:+:$LD_PRELOAD}"
 fi
 
-# Build dependencies and the official/base BambuStudio binary natively.
-./BuildLinux.sh -dsrf
+if [[ "${BAMBU_DEPS_ONLY:-0}" == 1 ]]; then
+    ./BuildLinux.sh -drf
+    test -d deps/build/destdir/usr/local
+    tar -C deps/build --numeric-owner --owner=0 --group=0 --sort=name \
+        --mtime='UTC 1970-01-01' -cf - destdir \
+        | zstd -T0 -3 -f -o "$OUT/BambuStudio_loongarch64_deps.tar.zst"
+    exit 0
+fi
+if [[ -n "$DEPS_ARCHIVE" ]]; then
+    ./BuildLinux.sh -srf
+else
+    ./BuildLinux.sh -dsrf
+fi
 test -x build/src/bambu-studio
 chmod 0755 build/src/BuildLinuxImage.sh
 (
