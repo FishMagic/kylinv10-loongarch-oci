@@ -60,12 +60,13 @@ debootstrap \
 
 if [ "$KYLIN_RUN_SECOND_STAGE" = 1 ]; then
     # The second stage executes target maintainer scripts; native LoongArch
-    # runners must run it, while local x86/QEMU smoke tests may skip it.
+    # runners must run it, while translated QEMU runners cannot safely run
+    # Kylin's ldconfig and maintainer scripts inside a nested chroot.
     chroot "$ROOTFS" /debootstrap/debootstrap --second-stage
 else
     # Foreign bootstrap has downloaded the requested archives but only
     # unpacked the base set. Extract the remaining archives without executing
-    # Kylin maintainer scripts; this mode is for QEMU smoke tests only.
+    # Kylin maintainer scripts; this is the translated-QEMU build mode.
     shopt -s nullglob
     BOOTSTRAP_DEBS=("$ROOTFS"/var/cache/apt/archives/*.deb)
     [ "${#BOOTSTRAP_DEBS[@]}" -gt 0 ] || { echo "foreign bootstrap produced no package archives" >&2; exit 1; }
@@ -73,6 +74,21 @@ else
         dpkg-deb -x "$deb" "$ROOTFS"
     done
     ldconfig -r "$ROOTFS"
+    # Kylin's gcc/awk/pkg-config packages create these links in postinst;
+    # provide the deterministic links needed by a build-only rootfs.
+    while read -r link target; do
+        if [ ! -e "$ROOTFS$link" ] && [ -e "$ROOTFS$target" ]; then
+            ln -s "$target" "$ROOTFS$link"
+        fi
+    done <<'LINKS'
+/usr/bin/awk /usr/bin/mawk
+/usr/bin/gcc /usr/bin/gcc-8
+/usr/bin/g++ /usr/bin/g++-8
+/usr/bin/cpp /usr/bin/cpp-8
+/usr/bin/cc /usr/bin/gcc
+/usr/bin/c++ /usr/bin/g++
+/usr/bin/pkg-config /usr/bin/pkgconf
+LINKS
 fi
 
 # Keep the exact source available for diagnostics, without copying helper apt
