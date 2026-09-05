@@ -24,6 +24,23 @@ export BAMBU_TARGET_DISTRO=loongarch64
 export SKIP_RAM_CHECK=1
 export DISABLE_PARALLEL_LIMIT=1
 export CMAKE_BUILD_PARALLEL_LEVEL="$JOBS"
+if [[ "${BAMBU_QEMU_TRANSLATED:-0}" == 1 ]]; then
+    # QEMU user-mode currently rejects the SIGCHLD mask used by make/ninja.
+    # This build-only shim keeps translated compilation usable; native builds
+    # leave signal handling untouched.
+    cat > /tmp/bambu-no-sigprocmask.c <<'EOF'
+#include <signal.h>
+int sigprocmask(int how, const sigset_t *set, sigset_t *oldset)
+{
+    (void)how;
+    (void)set;
+    (void)oldset;
+    return 0;
+}
+EOF
+    gcc -shared -fPIC -o /tmp/bambu-no-sigprocmask.so /tmp/bambu-no-sigprocmask.c
+    export LD_PRELOAD="/tmp/bambu-no-sigprocmask.so${LD_PRELOAD:+:$LD_PRELOAD}"
+fi
 
 # Build dependencies and the official/base BambuStudio binary natively.
 ./BuildLinux.sh -dsrf

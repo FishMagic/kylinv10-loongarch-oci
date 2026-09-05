@@ -21,9 +21,9 @@ on:
         default: true
         type: boolean
       runner:
-        description: 'LoongArch runner label; override when dispatching on a self-hosted runner'
+        description: 'Translated build runner label; native LoongArch is optional'
         required: false
-        default: loongarch64
+        default: ubuntu-24.04-arm
         type: string
 
 concurrency:
@@ -33,7 +33,7 @@ concurrency:
 jobs:
   build:
     name: Kylin V10 loongarch64 rootfs and OCI
-    runs-on: ${{ inputs.runner || vars.LOONGARCH_RUNNER || 'loongarch64' }}
+    runs-on: ${{ inputs.runner || vars.LOONGARCH_RUNNER || 'ubuntu-24.04-arm' }}
     timeout-minutes: 240
     permissions:
       contents: read
@@ -43,11 +43,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Verify native loongarch64 runner and disk
+      - name: Enable LoongArch emulation
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Verify translated build host and disk
         shell: bash
         run: |
           set -euo pipefail
-          case "$(uname -m)" in loongarch64|loong64) ;; *) exit 2 ;; esac
+          case "$(uname -m)" in x86_64|aarch64) ;; *) exit 2 ;; esac
           docker info
           df -h
 
