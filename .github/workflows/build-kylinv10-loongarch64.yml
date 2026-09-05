@@ -74,6 +74,7 @@ jobs:
           docker run --rm --platform linux/loong64 \
             --volume "$GITHUB_WORKSPACE:/src:ro" \
             --volume "$RUNNER_TEMP/kylinv10-rootfs:/out" \
+            --env KYLIN_RUN_SECOND_STAGE=0 \
             local/kylinv10-loongarch64-rootfs-builder:ci
 
       - name: Configure OCI exporter builder
