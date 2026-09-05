@@ -11,7 +11,12 @@ DOCKERFILE="${OCI_DOCKERFILE:-$ROOT/Dockerfile}"
 
 case "$(uname -m)" in
     loongarch64|loong64) ;;
-    *) echo "native loongarch64 is required; found $(uname -m)" >&2; exit 2 ;;
+    *)
+        if [[ "${KYLIN_QEMU_TRANSLATED:-0}" != 1 ]]; then
+            echo "native loongarch64 is required; found $(uname -m)" >&2
+            exit 2
+        fi
+        ;;
 esac
 [ -f "$ROOTFS_TAR" ] || { echo "rootfs tar not found: $ROOTFS_TAR" >&2; exit 2; }
 mkdir -p "$OUT_DIR"

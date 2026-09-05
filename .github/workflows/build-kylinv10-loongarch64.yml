@@ -88,6 +88,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          KYLIN_QEMU_TRANSLATED=1 \
           OCI_DOCKERFILE="$GITHUB_WORKSPACE/Dockerfile" \
           OCI_OUTPUT_PREFIX=kylinv10-loongarch64 \
             ./build-oci.sh \
